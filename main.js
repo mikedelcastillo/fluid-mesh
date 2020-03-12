@@ -1,166 +1,246 @@
-var points = [];
-var canvas, context;
-var GF = 0.98;
-var G = -1;
-var maxDistance = 20;
-var md = false, mx = 0, my = 0;
+(function () {
+    const canvas = document.getElementById("canvas")
+    const context = canvas.getContext("2d")
 
-var explosionPower = 0;
-var explosionDefault = 1;
-var explosionIncrease = 0;
+    const types = ["Mesh", "Line"]
 
-var width = 1, height = 2;
+    const props = {
+        friction: 0.98,
+        attraction: -1,
+        multiplier: 50,
+        effect: 0.6,
 
-var lineWidth = 1;
-
-var multiplier = 50;
-
-var mesh = true;
-
-window.addEventListener("load", function(){
-  canvas = document.getElementById("canvas");
-  context = canvas.getContext("2d");
-
-  resizeHandler();
-  window.addEventListener("resize", resizeHandler, false);
-
-  width = 20;
-  height = 20;
-
-  for(var i = 0; i < width; i++){
-    for(var j = 0; j < height; j++){
-      var s = maxDistance * 2;
-      points.push(new Point(maxDistance * 2 + i * s, maxDistance * 2 + j * s));
-    }
-  }
-
-
-  canvas.addEventListener("mousedown", function(e){
-    md = true;
-    mx = e.clientX;
-    my = e.clientY;
-  }, false);
-
-  canvas.addEventListener("mousemove", function(e){
-    mx = e.clientX;
-    my = e.clientY;
-  }, false);
-
-  canvas.addEventListener("mouseup", function(e){
-    md = false;
-  }, false);
-
-  loop();
-}, false);
-
-function resizeHandler(){
-  canvas.width = canvas.clientWidth;
-  canvas.height = canvas.clientHeight;
-}
-
-function loop(){
-  context.strokeStyle = "white";//;"rgb(255, 234, 143)";
-  context.fillStyle = "black";//"rgb(250, 99, 105)";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  for(var i = 0; i < points.length; i++) points[i].update();
-  for(var i = 0; i < points.length; i++) points[i].move();
-  context.beginPath();
-  context.lineWidth = lineWidth;
-
-  if(md){
-    explosionPower += explosionIncrease;
-  } else{
-    explosionPower = explosionDefault;
-  }
-
-  if(mesh){
-
-    for(var i = 0; i < points.length; i++){
-      var p = points[i];
-
-      if(i % height == 0) context.moveTo(p.px - (p.px - p.x) * multiplier, p.py - (p.py - p.y) * multiplier);
-      if(i % height != 0) context.lineTo(p.px - (p.px - p.x) * multiplier, p.py - (p.py - p.y) * multiplier);
+        size: 20,
+        lineWidth: 1,
+        type: types[0],
+        margin: 50,
     }
 
-    for(var j = 0; j < height; j++){
-      for(var i = 0; i < points.length; i += height){
-        var p = points[j + i];
-        if(i/height == 0) context.moveTo(p.px - (p.px - p.x) * multiplier, p.py - (p.py - p.y) * multiplier);
-        if(i/height != 0) context.lineTo(p.px - (p.px - p.x) * multiplier, p.py - (p.py - p.y) * multiplier);
-      }
+    const gui = new dat.GUI()
+    const folder1 = gui.addFolder("Movement")
+    folder1.open()
+    folder1.add(props, 'friction', 0.9, 1).step(0.001).name("Friction")
+    folder1.add(props, 'attraction', -5, -0.5).step(0.01).name("Attraction")
+    folder1.add(props, 'multiplier', 1, 100).step(0.01).name("Wave Size")
+    folder1.add(props, 'effect', 0.5, 1.5).step(0.01).name("Touch Effect")
+
+    const folder2 = gui.addFolder("Appearance")
+    folder2.open()
+    folder2.add(props, 'type', types).name("Type")
+    folder2.add(props, 'lineWidth', 1, 20).name("Stroke")
+    folder2.add(props, 'size', 10, 50).step(5).name("Size")
+        .onChange(value => {
+            resizeHandler()
+            generatePoints()
+        }).onFinishChange(value => {
+            resizeHandler()
+            generatePoints()
+        })
+    folder2.add(props, 'margin', 0, 200).name("Margin")
+        .onChange(value => {
+            resizeHandler()
+        }).onFinishChange(value => {
+            resizeHandler()
+        })
+
+    let points = []
+    let touch = []
+
+    let width = 0
+    let height = 0
+
+    let spacing = 10
+
+    let minDim = 0
+
+    function resizeHandler() {
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
+
+        minDim = Math.min(canvas.width, canvas.height) - props.margin
+        spacing = (minDim) / props.size
+
+        width = props.size
+        height = props.size
+
+        setPointsPosition()
     }
-  } else{
-    for(var i = 0; i < points.length; i++){
-      var p = points[i];
 
-      var n = 5;
-
-      context.moveTo(p.px, p.py);
-      context.lineTo(p.px - (p.px - p.x) * multiplier, p.py - (p.py - p.y) * multiplier);
-    }
-  }
-
-  context.stroke();
-
-  requestAnimationFrame(loop);
-}
-
-function Point(x, y){
-  this.vx = 0;
-  this.vy = 0;
-
-  this.x = this.px = x;
-  this.y = this.py = y;
-
-  this.update = function(){
-    for(var i = 0; i < points.length; i++){
-      var poin = points[i];
-
-      if(poin != this){
-        var dx = poin.px - poin.x;
-        var dy = poin.py - poin.y;
-
-        var dist2 = ((this.x - poin.px) * (this.x - poin.px) + (this.y - poin.py) * (this.y - poin.py));
-
-        if(dist2 != 0){
-          this.vx += G * dx/dist2;
-          this.vy += G * dy/dist2;
-
-          poin.vx -= G * dx/dist2;
-          poin.vy -= G * dy/dist2;
+    function generatePoints() {
+        points = []
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                points.push(new Point(0, 0))
+            }
         }
-      }
+
+        setPointsPosition()
     }
 
-    if(md){
-      var dx = this.x - mx;
-      var dy = this.y - my;
+    function setPointsPosition() {
+        let wx = canvas.width / 2 - ((width - 1) * spacing) / 2
+        let wy = canvas.height / 2 - ((height - 1) * spacing) / 2
 
-      var dist2 = (dx * dx + dy * dy);
-      //dist2 = Math.max(1, dist2);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let point = points[x + y * width]
+                if (point) {
+                    let px = x * spacing + wx
+                    let py = y * spacing + wy
 
-      this.vx += explosionPower * dx/dist2;
-      this.vy += explosionPower * dy/dist2;
+                    let ox = px - point.x
+                    let oy = py - point.y
+
+                    point.x += ox
+                    point.y += oy
+
+                    point.px += ox
+                    point.py += oy
+                }
+            }
+        }
+
     }
 
-    this.vx += (this.px - this.x)/200;
-    this.vy += (this.py - this.y)/200;
+    resizeHandler()
+    generatePoints()
+    window.addEventListener("resize", resizeHandler, false)
 
-    this.vx *= GF;
-    this.vy *= GF;
-  };
+    let mouse = {
+        x: 0,
+        y: 0,
+    }
 
-  this.move = function(){
-    this.x += this.vx;
-    this.y += this.vy;
-    /*
+    function mouseHandler(e) {
+        if (e.type === "mousedown") touch = [mouse]
+        mouse.x = e.pageX
+        mouse.y = e.pageY
+        e.preventDefault()
+    }
 
-    var angle = Math.PI + Math.atan2(this.py - this.y, this.px - this.x);
-    var dist = Math.min(maxDistance, Math.sqrt((this.px - this.x) * (this.px - this.x) + (this.py - this.y) * (this.py - this.y)));
+    function touchHandler(e) {
+        touch = []
+        for (let i = 0; i < e.touches.length; i++) {
+            touch.push({
+                x: e.touches[i].pageX,
+                y: e.touches[i].pageY,
+            })
+        }
+        e.preventDefault()
+    }
 
-    if(dist == maxDistance) this.vx = this.vy = 0;
+    function touchEnd(e) {
+        touch = []
+        e.preventDefault()
+    }
+    canvas.addEventListener("mousedown", mouseHandler);
+    canvas.addEventListener("mousemove", mouseHandler);
+    canvas.addEventListener("mouseup", touchEnd);
 
-    this.x = this.px + Math.cos(angle) * dist;
-    this.y = this.py + Math.sin(angle) * dist;*/
-  };
-}
+    canvas.addEventListener("touchstart", touchHandler)
+    canvas.addEventListener("touchmove", touchHandler)
+    canvas.addEventListener("touchend", touchEnd)
+
+    loop()
+
+    function loop() {
+        context.strokeStyle = "white"
+        context.fillStyle = "black"
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < points.length; i++) points[i].update()
+        for (let i = 0; i < points.length; i++) points[i].move()
+
+        context.beginPath();
+        context.lineWidth = props.lineWidth;
+
+        if (props.type === types[0]) {
+            for (let i = 0; i < points.length; i++) {
+                let p = points[i]
+                let action = "lineTo"
+
+                if (i % width === 0) action = "moveTo"
+                context[action](p.dx, p.dy)
+            }
+
+            for (let j = 0; j < width; j++) {
+                for (let i = 0; i < height; i++) {
+                    let p = points[j + i * width]
+                    let action = "lineTo"
+
+                    if (i === 0) action = "moveTo"
+                    context[action](p.dx, p.dy)
+                }
+            }
+
+        } else if (props.type === types[1]) {
+            for (let i = 0; i < points.length; i++) {
+                let p = points[i]
+
+                context.moveTo(p.px, p.py);
+                context.lineTo(p.dx, p.dy)
+            }
+        }
+
+        context.stroke()
+
+        requestAnimationFrame(loop)
+    }
+
+    function Point(x, y) {
+        this.vx = 0
+        this.vy = 0
+
+        this.x = this.px = x
+        this.y = this.py = y
+
+        this.dx = 0
+        this.dy = 0
+
+        this.update = function () {
+            for (let i = 0; i < points.length; i++) {
+                let poin = points[i]
+
+                if (poin != this) {
+                    let dx = poin.px - poin.x
+                    let dy = poin.py - poin.y
+
+                    let dist2 = ((this.x - poin.px) * (this.x - poin.px) + (this.y - poin.py) * (this.y - poin.py))
+
+                    if (dist2 != 0) {
+                        this.vx += props.attraction * dx / dist2
+                        this.vy += props.attraction * dy / dist2
+
+                        poin.vx -= props.attraction * dx / dist2
+                        poin.vy -= props.attraction * dy / dist2
+                    }
+                }
+            }
+
+            for (let t of touch) {
+                let dx = this.x - t.x
+                let dy = this.y - t.y
+
+                let dist2 = (dx * dx + dy * dy);
+                //dist2 = Math.max(1, dist2);
+
+                this.vx += props.effect * dx / dist2;
+                this.vy += props.effect * dy / dist2;
+            }
+
+            this.vx += (this.px - this.x) / 200
+            this.vy += (this.py - this.y) / 200;
+
+            this.vx *= props.friction
+            this.vy *= props.friction
+        }
+
+        this.move = function () {
+            this.x += this.vx
+            this.y += this.vy
+
+            this.dx = this.px - (this.px - this.x) * props.multiplier
+            this.dy = this.py - (this.py - this.y) * props.multiplier
+        }
+    }
+})()
