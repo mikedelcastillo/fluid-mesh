@@ -14,6 +14,7 @@
         lineWidth: 1,
         type: types[0],
         margin: 50,
+        cursor: true,
     }
 
     const gui = new dat.GUI()
@@ -41,6 +42,11 @@
             resizeHandler()
         }).onFinishChange(value => {
             resizeHandler()
+        })
+    
+    folder2.add(props, 'cursor').name("Show Cursor")
+        .onFinishChange(value => {
+            document.body.setAttribute("class", value ? "" : "no-cursor")
         })
 
     let points = []
@@ -133,6 +139,9 @@
         touch = []
         e.preventDefault()
     }
+    
+    window.addEventListener("scroll", e => e.preventDefault)
+    
     canvas.addEventListener("mousedown", mouseHandler);
     canvas.addEventListener("mousemove", mouseHandler);
     canvas.addEventListener("mouseup", touchEnd);
