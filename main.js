@@ -2,7 +2,7 @@
     const canvas = document.getElementById("canvas")
     const context = canvas.getContext("2d")
 
-    const types = ["Mesh", "Line"]
+    const types = ["Mesh", "Line", "Circles", "Emojis"]
 
     const props = {
         friction: 0.98,
@@ -14,11 +14,17 @@
         lineWidth: 1,
         type: types[0],
         margin: 50,
+        background: "#000000",
+        foreground: "#ffffff",
         cursor: true,
+        
+        reset(){
+            window.location.reload()
+        },
     }
 
     const gui = new dat.GUI()
-    const folder1 = gui.addFolder("Movement")
+    const folder1 = gui.addFolder("Motion")
     folder1.open()
     folder1.add(props, 'friction', 0.9, 1).step(0.001).name("Friction")
     folder1.add(props, 'attraction', -5, -0.5).step(0.01).name("Attraction")
@@ -44,10 +50,20 @@
             resizeHandler()
         })
     
+    folder2.addColor(props, 'background').name("Background")
+    folder2.addColor(props, 'foreground').name("Foreground")
+
     folder2.add(props, 'cursor').name("Show Cursor")
         .onFinishChange(value => {
             document.body.setAttribute("class", value ? "" : "no-cursor")
         })
+    
+    gui.add(props, "reset").name("Reset")
+    
+    let emojiList = "👀🥰🤣😉😁😘🤣😍😁😛😏🤓😕😩🥵🥺🥶😟😭😣🥵🥱🙄😮🤔🤤😥"
+    let emojis = []
+    
+    for(let i = 0; i < emojiList.length/2; i += 2) emojis.push(emojiList.slice(i, i+2))
 
     let points = []
     let touch = []
@@ -153,17 +169,18 @@
     loop()
 
     function loop() {
-        context.strokeStyle = "white"
-        context.fillStyle = "black"
+        context.strokeStyle = props.foreground
+        context.fillStyle = props.background
         context.fillRect(0, 0, canvas.width, canvas.height);
 
         for (let i = 0; i < points.length; i++) points[i].update()
+        
         for (let i = 0; i < points.length; i++) points[i].move()
 
-        context.beginPath();
         context.lineWidth = props.lineWidth;
 
         if (props.type === types[0]) {
+            context.beginPath();
             for (let i = 0; i < points.length; i++) {
                 let p = points[i]
                 let action = "lineTo"
@@ -181,17 +198,46 @@
                     context[action](p.dx, p.dy)
                 }
             }
-
-        } else if (props.type === types[1]) {
+            context.stroke()
+        }
+        
+        if (props.type === types[1]) {
+            context.beginPath();
             for (let i = 0; i < points.length; i++) {
                 let p = points[i]
 
-                context.moveTo(p.px, p.py);
+                context.moveTo(p.px, p.py)
                 context.lineTo(p.dx, p.dy)
             }
+            context.stroke()
         }
-
-        context.stroke()
+        
+        if (props.type === types[2]) {
+            context.beginPath();
+            for (let i = 0; i < points.length; i++) {
+                let p = points[i]
+                let dx = p.dx - p.px
+                let dy = p.dy - p.py
+                let r = Math.sqrt(dx * dx + dy * dy)
+                context.moveTo(p.dx + r, p.dy)
+                context.arc(p.dx, p.dy, r, 0, Math.PI * 2)
+            }
+            context.stroke()
+        }
+        
+        if (props.type === types[3]) {
+            for (let i = 0; i < points.length; i++) {
+                let p = points[i]
+                let dx = p.dx - p.px
+                let dy = p.dy - p.py
+                let r = Math.sqrt(dx * dx + dy * dy)
+                
+                context.font = r + 'px serif'
+                context.textAlign = "center"
+                context.textBaseline = "middle"
+                context.fillText(p.emoji, p.dx, p.dy)
+            }
+        }
 
         requestAnimationFrame(loop)
     }
@@ -205,6 +251,8 @@
 
         this.dx = 0
         this.dy = 0
+        
+        this.emoji = emojis[Math.floor(Math.random() * emojis.length)]
 
         this.update = function () {
             for (let i = 0; i < points.length; i++) {
@@ -231,7 +279,6 @@
                 let dy = this.y - t.y
 
                 let dist2 = (dx * dx + dy * dy);
-                //dist2 = Math.max(1, dist2);
 
                 this.vx += props.effect * dx / dist2;
                 this.vy += props.effect * dy / dist2;
